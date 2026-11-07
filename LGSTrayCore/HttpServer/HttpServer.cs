@@ -18,7 +18,9 @@ namespace LGSTrayCore.HttpServer
             {
                 if (disposing)
                 {
-                    _server.Dispose();
+                    _serverCts?.Cancel();
+                    _serverCts?.Dispose();
+                    _server?.Dispose();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
@@ -45,8 +47,8 @@ namespace LGSTrayCore.HttpServer
         private readonly AppSettings _appSettings;
         private readonly HttpControllerFactory _httpControllerFactory;
 
-        private CancellationTokenSource _serverCts = null!;
-        private WebServer _server = null!;
+        private CancellationTokenSource? _serverCts;
+        private WebServer? _server;
 
         public HttpServer(IOptions<AppSettings> appSettings, HttpControllerFactory httpControllerFactory)
         {
@@ -56,16 +58,28 @@ namespace LGSTrayCore.HttpServer
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _serverCts = new();
-            _server = CreateServer(_appSettings, _httpControllerFactory);
-            _server.RunAsync(_serverCts.Token);
+            // A failing web server must not take the whole application down (the tray icon and MQTT
+            // keep working); the reason is written to lgstray.log.
+            try
+            {
+                _serverCts = new();
+                _server = CreateServer(_appSettings, _httpControllerFactory);
+                _server.RunAsync(_serverCts.Token).ContinueWith(
+                    t => AppLog.Write($"HTTP server at {_appSettings.HTTPServer.UrlPrefix} stopped with an error", t.Exception),
+                    TaskContinuationOptions.OnlyOnFaulted
+                );
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write($"HTTP server at {_appSettings.HTTPServer.UrlPrefix} could not be started", ex);
+            }
 
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _serverCts.Cancel();
+            _serverCts?.Cancel();
 
             return Task.CompletedTask;
         }

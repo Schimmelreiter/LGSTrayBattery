@@ -50,7 +50,8 @@ class PublishHelper:
         for proj in ["LGSTrayHID", "LGSTrayUI"]:
             subprocess.run(
                 ["dotnet", "publish", f"{proj}/{proj}.csproj", f"/p:PublishProfile={profile}", f"/p:Version={TARGET_VER}"],
-                shell=False
+                shell=False,
+                check=True
             )
 
         if self.no_zip:

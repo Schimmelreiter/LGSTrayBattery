@@ -2,6 +2,21 @@
 
 A rewrite/combination of my two programs [LGSTrayBattery](https://github.com/andyvorld/LGSTrayBattery) and [LGSTrayBattery_GHUB](https://github.com/andyvorld/LGSTrayBattery_GHUB), which should allow for interaction via both the native HID and Logitech GaminG Hub websockets.
 
+> **Fork notice:** This is a fork of [andyvorld/LGSTrayBattery](https://github.com/andyvorld/LGSTrayBattery) by Schimmelreiter.
+> It adds an MQTT publisher with Home Assistant discovery and fixes a startup crash. Many thanks to
+> **andyvorld** for the original program - all credit for LGSTrayBattery goes to him.
+> Releases of this fork: [Schimmelreiter/LGSTrayBattery/releases](https://github.com/Schimmelreiter/LGSTrayBattery/releases).
+> Please report problems with the additions of this fork here, not upstream.
+
+## Changes in this fork (3.0.4-schimmelreiter)
+- **MQTT / Home Assistant:** optional `[MQTT]` section in `appsettings.toml` (see below).
+- **Startup crash fixed:** if a part of the program failed during startup, cleaning up the HTTP server
+  threw a `NullReferenceException` in `HttpServer.Dispose` that hid the real error. Now the real error is
+  written to `crashlog_<time>.log` and shown in a message box.
+- A failing HTTP server (port in use, invalid address) no longer stops the program; the reason is logged.
+- Errors that were silently ignored before are written to `lgstray.log` next to the program.
+- A second instance shows a message instead of crashing.
+
 ## How to install
 
 [![GitHub Release](https://img.shields.io/github/v/release/andyvorld/LGSTrayBattery?sort=semver)](https://github.com/andyvorld/LGSTrayBattery/releases/latest)
@@ -88,6 +103,34 @@ Device ids starting with `dev` originates from tapping into Logitech GHUB's own 
 \** - Depends on the device
 
 \*** - Logitech G Hub's metric of estimated life left on the battery
+
+### MQTT / Home Assistant (fork)
+With `enabled = true` in the `[MQTT]` section, the battery state of every device is published to an MQTT
+broker. Home Assistant creates the devices and entities automatically (MQTT discovery).
+
+```
+[MQTT]
+enabled = true
+host = "homeassistant.local"
+port = 1883
+useTls = false
+username = "lgstray"
+password = "..."
+# Name of this PC in Home Assistant (empty = computer name)
+name = ""
+topicPrefix = "lgstray"
+discoveryPrefix = "homeassistant"
+```
+
+Per device: battery level (%), charging (on/off), voltage (if the device reports it) and the time of the
+last update. Per PC: a connectivity sensor, which turns off via the MQTT last will when the PC or the
+program stops. The battery values are retained and have no availability topic, so Home Assistant keeps
+the last known level while the PC is off.
+
+Topics: `{topicPrefix}/{name}/status` (`online`/`offline`) and `{topicPrefix}/{name}/{deviceId}/state`
+(JSON: `battery`, `charging`, `status`, `voltage`, `last_update`).
+
+Use a separate broker user for each PC. The password is stored in plain text in `appsettings.toml`.
 
 ## HID++ Device Sources
 As of v3.0.0, there are 2 sources in which the program will pull battery status,

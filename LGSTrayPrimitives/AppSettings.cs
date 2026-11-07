@@ -9,6 +9,8 @@ public class AppSettings
     public IDeviceManagerSettings GHub { get; set; } = null!;
 
     public NativeDeviceManagerSettings Native { get; set; } = null!;
+
+    public MqttSettings MQTT { get; set; } = new();
 }
 
 public class UISettings
@@ -44,4 +46,20 @@ public class NativeDeviceManagerSettings : IDeviceManagerSettings
     public int PollPeriod { get; set; } = 600;
 
     public IEnumerable<string> DisabledDevices { get; set; } = [];
+}
+
+public class MqttSettings
+{
+    public bool Enabled { get; set; }
+    public string Host { get; set; } = "";
+    public int Port { get; set; } = 1883;
+    public bool UseTls { get; set; }
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+
+    /// <summary>Name of this PC in Home Assistant, also used in the topics. Default: computer name.</summary>
+    public string Name { get; set; } = "";
+
+    public string TopicPrefix { get; set; } = "lgstray";
+    public string DiscoveryPrefix { get; set; } = "homeassistant";
 }

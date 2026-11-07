@@ -21,6 +21,8 @@ namespace LGSTrayUI;
 /// </summary>
 public partial class App : Application
 {
+    private static Mutex? _singleInstance;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -29,7 +31,40 @@ public partial class App : Application
         Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
         AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(CrashHandler);
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            AppLog.Write("Unobserved task exception", args.Exception);
+            args.SetObserved();
+        };
 
+        // A second instance cannot open the IPC pipe and would fail during startup.
+        _singleInstance = new Mutex(true, @"Local\LGSTrayUI", out bool createdNew);
+        if (!createdNew)
+        {
+            MessageBox.Show("LGSTray is already running.", "LGSTray", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
+
+        try
+        {
+            await RunHost();
+        }
+        catch (Exception ex)
+        {
+            // Report the real startup error instead of a follow-up error while cleaning up.
+            var file = WriteCrashLog(ex);
+            MessageBox.Show(
+                $"LGSTray could not start:\n\n{ex.GetBaseException().Message}\n\nDetails: {file}",
+                "LGSTray - Startup Error", MessageBoxButton.OK, MessageBoxImage.Error
+            );
+        }
+
+        Dispatcher.InvokeShutdown();
+    }
+
+    private async Task RunHost()
+    {
         EnableEfficiencyMode();
 
         var builder = Host.CreateEmptyApplicationBuilder(null);
@@ -43,6 +78,7 @@ public partial class App : Application
         builder.Services.AddSingleton<LogiDeviceViewModelFactory>();
 
         builder.Services.AddWebserver(builder.Configuration);
+        builder.Services.AddMqtt(builder.Configuration);
 
         builder.Services.AddIDeviceManager<LGSTrayHIDManager>(builder.Configuration);
         builder.Services.AddIDeviceManager<GHubManager>(builder.Configuration);
@@ -53,7 +89,6 @@ public partial class App : Application
 
         var host = builder.Build();
         await host.RunAsync();
-        Dispatcher.InvokeShutdown();
     }
 
     static async Task LoadAppSettings(Microsoft.Extensions.Configuration.ConfigurationManager config)
@@ -91,10 +126,25 @@ public partial class App : Application
 
     private void CrashHandler(object sender, UnhandledExceptionEventArgs args)
     {
-        Exception e = (Exception)args.ExceptionObject;
-        long unixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
+        WriteCrashLog((Exception)args.ExceptionObject);
+    }
 
-        using StreamWriter writer = new($"./crashlog_{unixTime}.log", false);
-        writer.WriteLine(e.ToString());
+    private static string WriteCrashLog(Exception e)
+    {
+        long unixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
+        string file = Path.Combine(AppContext.BaseDirectory, $"crashlog_{unixTime}.log");
+
+        try
+        {
+            using StreamWriter writer = new(file, false);
+            writer.WriteLine(e.ToString());
+        }
+        catch
+        {
+            // ignore, the log below is the fallback
+        }
+        AppLog.Write("Crash", e);
+
+        return file;
     }
 }

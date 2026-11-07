@@ -7,6 +7,19 @@ addr = "localhost"
 port = 12321
 useIpv6 = true
 
+[MQTT]
+# Publish battery state to an MQTT broker, with Home Assistant discovery
+enabled = false
+host = "homeassistant.local"
+port = 1883
+useTls = false
+username = ""
+password = ""
+# Name of this PC in Home Assistant (empty = computer name)
+name = ""
+topicPrefix = "lgstray"
+discoveryPrefix = "homeassistant"
+
 [GHub]
 enabled = true
 

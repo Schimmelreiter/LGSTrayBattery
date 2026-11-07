@@ -18,6 +18,15 @@ public static class IServiceExtension
         services.AddHostedService<HttpServer.HttpServer>();
     }
 
+    public static void AddMqtt(this IServiceCollection services, IConfiguration configs)
+    {
+        var settings = configs.Get<AppSettings>()!;
+        if (settings.MQTT is not { Enabled: true }) return;
+
+        services.AddSingleton<Mqtt.MqttPublisher>();
+        services.AddSingleton<IHostedService>(p => p.GetRequiredService<Mqtt.MqttPublisher>());
+    }
+
     public static void AddIDeviceManager<T>(this IServiceCollection services, IConfiguration configs) where T : class, IDeviceManager, IHostedService
     {
         var settings = configs.Get<AppSettings>()!;
