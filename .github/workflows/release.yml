@@ -1,8 +1,11 @@
 name: Release
 
+# Every push to the branch "schimmelreiter" builds the program. If the version in LGSTrayUI.csproj
+# has no release yet, a release v<version>-schimmelreiter (with tag) is created.
 on:
   push:
-    tags: ['v*']
+    branches: ['schimmelreiter']
+    paths-ignore: ['readme.md', 'RELEASE_NOTES.md']
   workflow_dispatch:
 
 permissions:
@@ -33,10 +36,17 @@ jobs:
         name: LGSTray
         path: bin/Release/Publish/*.zip
 
-    - name: Create release
-      if: startsWith(github.ref, 'refs/tags/')
+    - name: Create release (once per version)
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "${{ github.ref_name }}" (get-item ./bin/Release/Publish/*.zip) `
-          -R "${{ github.repository }}" --title "${{ github.ref_name }}" --notes-file RELEASE_NOTES.md
+        $PSNativeCommandUseErrorActionPreference = $false
+        $version = ([xml](Get-Content LGSTrayUI/LGSTrayUI.csproj)).Project.PropertyGroup.VersionPrefix | Where-Object { $_ } | Select-Object -First 1
+        $tag = "v$version-schimmelreiter"
+        gh release view $tag -R "${{ github.repository }}" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "Release $tag already exists - build only"
+          exit 0
+        }
+        gh release create $tag (get-item ./bin/Release/Publish/*.zip) `
+          -R "${{ github.repository }}" --target "${{ github.sha }}" --title $tag --notes-file RELEASE_NOTES.md
