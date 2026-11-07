@@ -83,7 +83,17 @@ namespace LGSTrayUI
 
             dev = _logiDeviceViewModelFactory.CreateViewModel((x) => x.UpdateState(initMessage));
 
-            Application.Current.Dispatcher.BeginInvoke(() => Devices.Add(dev));
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                Devices.Add(dev);
+
+                // Nothing selected yet (first start): show the first device with a battery in the tray.
+                if (initMessage.hasBattery && !_userSettings.HasSelectedDevices)
+                {
+                    dev.IsChecked = true;
+                    _userSettings.AddDevice(dev.DeviceId);
+                }
+            });
         }
 
         public void OnUpdateMessage(UpdateMessage updateMessage)

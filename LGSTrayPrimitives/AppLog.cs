@@ -1,7 +1,7 @@
 namespace LGSTrayPrimitives;
 
 /// <summary>
-/// Minimal file log next to the executable (lgstray.log). Used for errors that would otherwise be
+/// Minimal file log in %LOCALAPPDATA%\LGSTray\lgstray.log. Used for errors that would otherwise be
 /// swallowed (startup failures, HTTP server, MQTT). Never logs passwords.
 /// </summary>
 public static class AppLog
@@ -9,7 +9,7 @@ public static class AppLog
     private const long MaxSize = 1024 * 1024;
     private static readonly object _lock = new();
 
-    private static string FilePath => Path.Combine(AppContext.BaseDirectory, "lgstray.log");
+    public static string FilePath => Path.Combine(AppPaths.DataDirectory, "lgstray.log");
 
     public static void Write(string message, Exception? ex = null)
     {
@@ -17,6 +17,7 @@ public static class AppLog
         {
             lock (_lock)
             {
+                Directory.CreateDirectory(AppPaths.DataDirectory);
                 var path = FilePath;
                 var info = new FileInfo(path);
                 if (info.Exists && info.Length > MaxSize)

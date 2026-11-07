@@ -62,4 +62,16 @@ public class MqttSettings
 
     public string TopicPrefix { get; set; } = "lgstray";
     public string DiscoveryPrefix { get; set; } = "homeassistant";
+
+    /// <summary>Report this PC: last boot, CPU load and (notebooks) battery.</summary>
+    public bool PcSensors { get; set; } = true;
+
+    /// <summary>Seconds between two PC reports; the CPU load is the average over this time.</summary>
+    public int PcInterval { get; set; } = 30;
+
+    /// <summary>Accept commands (shutdown, restart, hibernate, sleep, lock) from Home Assistant.</summary>
+    public bool Commands { get; set; }
+
+    /// <summary>Seconds of warning before shutdown/restart (can be cancelled with "shutdown /a").</summary>
+    public int ShutdownDelay { get; set; } = 60;
 }

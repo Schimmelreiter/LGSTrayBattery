@@ -93,9 +93,10 @@ public partial class App : Application
 
     static async Task LoadAppSettings(Microsoft.Extensions.Configuration.ConfigurationManager config)
     {
+        string settingsFile = AppPaths.EnsureSettingsFile();
         try
         {
-            config.AddTomlFile("appsettings.toml");
+            config.AddTomlFile(settingsFile);
         }
         catch (Exception ex)
         {
@@ -110,12 +111,12 @@ public partial class App : Application
                 if (msgBoxRet == MessageBoxResult.Yes)
                 {
                     await File.WriteAllBytesAsync(
-                        Path.Combine(AppContext.BaseDirectory, "appsettings.toml"),
+                        settingsFile,
                         LGSTrayUI.Properties.Resources.defaultAppsettings
                     );
                 }
 
-                config.AddTomlFile("appsettings.toml");
+                config.AddTomlFile(settingsFile);
             }
             else
             {
@@ -132,10 +133,11 @@ public partial class App : Application
     private static string WriteCrashLog(Exception e)
     {
         long unixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
-        string file = Path.Combine(AppContext.BaseDirectory, $"crashlog_{unixTime}.log");
+        string file = Path.Combine(AppPaths.DataDirectory, $"crashlog_{unixTime}.log");
 
         try
         {
+            Directory.CreateDirectory(AppPaths.DataDirectory);
             using StreamWriter writer = new(file, false);
             writer.WriteLine(e.ToString());
         }

@@ -18,6 +18,7 @@ namespace LGSTrayCore.Mqtt;
 /// Topics (node = configured name or computer name):
 ///   {topicPrefix}/{node}/status          online / offline (last will), retained
 ///   {topicPrefix}/{node}/{device}/state  JSON with battery, charging, voltage, last_update, retained
+///   (PC sensors and commands: see MqttPublisher.Pc.cs)
 ///
 /// The battery entities have no availability topic on purpose: when the PC is off, Home Assistant keeps
 /// showing the last known battery level. Whether the PC is reachable is a separate connectivity sensor.
@@ -107,6 +108,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
             _subscription = _subscriber.Subscribe(OnMessage);
 
             await _client.StartAsync(managedOptions);
+            await StartPcAsync();
         }
         catch (Exception ex)
         {
@@ -118,6 +120,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
     {
         _subscription?.Dispose();
         _subscription = null;
+        StopPc();
 
         if (_client == null)
         {
@@ -172,6 +175,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
                 ["device"] = PcDevice(),
             })
         );
+        await AnnouncePcAsync();
 
         List<string> ids;
         lock (_lock)
@@ -354,7 +358,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
         ["identifiers"] = new[] { $"lgstray_{_node}" },
         ["name"] = $"LGSTray {_displayName}",
         ["manufacturer"] = "LGSTray",
-        ["model"] = "Logitech battery monitor",
+        ["model"] = "Windows PC",
         ["sw_version"] = _version,
     };
 

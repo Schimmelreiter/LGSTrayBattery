@@ -21,7 +21,7 @@ namespace LGSTrayHID
                 AppLog.Write("HID helper (LGSTrayHID.exe) crashed", e.ExceptionObject as Exception);
 
             var builder = Host.CreateEmptyApplicationBuilder(null);
-            builder.Configuration.AddTomlFile("appsettings.toml");
+            builder.Configuration.AddTomlFile(AppPaths.EnsureSettingsFile());
 
             GlobalSettings.settings = builder.Configuration.GetSection("Native")
                 .Get<NativeDeviceManagerSettings>() ?? GlobalSettings.settings;

@@ -19,6 +19,13 @@ password = ""
 name = ""
 topicPrefix = "lgstray"
 discoveryPrefix = "homeassistant"
+# Report this PC: last boot, CPU load (average over pcInterval seconds), battery of notebooks
+pcSensors = true
+pcInterval = 30
+# Buttons in Home Assistant: shutdown, restart, cancel shutdown, hibernate, sleep, lock
+commands = false
+# Warning time in seconds before shutdown/restart
+shutdownDelay = 60
 
 [GHub]
 enabled = true

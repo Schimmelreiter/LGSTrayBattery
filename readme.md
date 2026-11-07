@@ -9,6 +9,16 @@ A rewrite/combination of my two programs [LGSTrayBattery](https://github.com/and
 > Please report problems with the additions of this fork here, not upstream.
 
 ## Changes in this fork
+### 3.0.6-schimmelreiter
+- **Storage locations:** settings and logs are no longer kept in the program folder (see
+  [Storage locations](#storage-locations-fork)). The selected tray devices are stored in the registry, so
+  they are no longer lost after an update or when LGSTray is started via a differently spelled path.
+- If no device is selected yet, the first device with a battery is selected automatically.
+- **MQTT, this PC as a device:** last boot, CPU load (average over `pcInterval`), and on notebooks battery,
+  charging, power plug and remaining battery time.
+- **MQTT commands (optional, `commands = true`):** buttons in Home Assistant for shutdown, restart, cancel
+  shutdown, hibernate, sleep and lock.
+
 ### 3.0.5-schimmelreiter
 - MQTT: entities use the translated device class names of Home Assistant (e.g. "Battery", "Charging")
   instead of the device name; battery level without decimals.
@@ -141,6 +151,45 @@ Topics: `{topicPrefix}/{name}/status` (`online`/`offline`) and `{topicPrefix}/{n
 (JSON: `battery`, `charging`, `status`, `voltage`, `last_update`).
 
 Use a separate broker user for each PC. The password is stored in plain text in `appsettings.toml`.
+
+#### This PC (`pcSensors`, default on)
+The PC appears as device "LGSTray {name}" with: connectivity (last will), last boot (timestamp), CPU load in %
+(average over `pcInterval` seconds, same counter as the Task Manager) and - only if Windows reports a system
+battery - battery level (with charging icon), charging, power plug and remaining battery time (minutes, empty
+while on AC power). Topic: `{topicPrefix}/{name}/pc/state`.
+
+```
+pcSensors = true
+pcInterval = 30
+```
+
+#### Commands (`commands`, default off)
+With `commands = true`, Home Assistant gets buttons for shutdown, restart, cancel shutdown, hibernate, sleep
+and lock. Shutdown and restart show the Windows warning `shutdownDelay` seconds in advance and can be
+cancelled with the button or `shutdown /a`. Commands arrive on `{topicPrefix}/{name}/command`
+(`shutdown`, `restart`, `abort`, `hibernate`, `sleep`, `lock`); retained messages are ignored.
+
+```
+commands = true
+shutdownDelay = 60
+```
+
+Note: with the default settings of the Mosquitto add-on every broker user may publish to every topic. If you
+enable commands, consider an ACL that allows only Home Assistant to publish to `lgstray/+/command`.
+
+## Storage locations (fork)
+| What | Where |
+|------|-------|
+| Settings (`appsettings.toml`) | `%LOCALAPPDATA%\LGSTray\appsettings.toml` |
+| Log (`lgstray.log`) and crash logs (`crashlog_*.log`) | `%LOCALAPPDATA%\LGSTray\` |
+| Selected tray devices, numeric icon | `HKEY_CURRENT_USER\Software\LGSTray` (`SelectedDevices`, `NumericDisplay`) |
+| Autostart | `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` (unchanged) |
+
+The program folder only contains the template `appsettings.default.toml`. On the first start of 3.0.6, an
+existing `appsettings.toml` in the program folder (versions up to 3.0.5) is copied once to
+`%LOCALAPPDATA%\LGSTray`, otherwise the template. After that, edit only the file in `%LOCALAPPDATA%\LGSTray`
+(the old file in the program folder can be deleted). Updating is simple: extract the new zip over the program
+folder - it no longer contains an `appsettings.toml`. The previous tray selection (.NET `user.config`) is taken over once as well.
 
 ## HID++ Device Sources
 As of v3.0.0, there are 2 sources in which the program will pull battery status,
