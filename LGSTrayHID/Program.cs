@@ -17,6 +17,9 @@ namespace LGSTrayHID
     {
         static async Task Main(string[] args)
         {
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+                AppLog.Write("HID helper (LGSTrayHID.exe) crashed", e.ExceptionObject as Exception);
+
             var builder = Host.CreateEmptyApplicationBuilder(null);
             builder.Configuration.AddTomlFile("appsettings.toml");
 

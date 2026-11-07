@@ -8,7 +8,17 @@ A rewrite/combination of my two programs [LGSTrayBattery](https://github.com/and
 > Releases of this fork: [Schimmelreiter/LGSTrayBattery/releases](https://github.com/Schimmelreiter/LGSTrayBattery/releases).
 > Please report problems with the additions of this fork here, not upstream.
 
-## Changes in this fork (3.0.4-schimmelreiter)
+## Changes in this fork
+### 3.0.5-schimmelreiter
+- MQTT: entities use the translated device class names of Home Assistant (e.g. "Battery", "Charging")
+  instead of the device name; battery level without decimals.
+- MQTT: while a device is charging, the battery entity gets a charging icon (`mdi:battery-charging-NN`), like
+  the Home Assistant companion app. Together with `state_color: true` in a card, no template is needed.
+- Native HID: a forced battery update was never reported (inverted condition) - fixed.
+- `lgstray.log`: the HID helper's crashes, restarts and giving up, and devices that do not answer battery
+  queries for more than 30 minutes.
+
+### 3.0.4-schimmelreiter
 - **MQTT / Home Assistant:** optional `[MQTT]` section in `appsettings.toml` (see below).
 - **Startup crash fixed:** if a part of the program failed during startup, cleaning up the HTTP server
   threw a `NullReferenceException` in `HttpServer.Dispose` that hid the real error. Now the real error is
@@ -123,7 +133,7 @@ discoveryPrefix = "homeassistant"
 ```
 
 Per device: battery level (%), charging (on/off), voltage (if the device reports it) and the time of the
-last update. Per PC: a connectivity sensor, which turns off via the MQTT last will when the PC or the
+last update. While charging, the battery entity shows a charging icon. Per PC: a connectivity sensor, which turns off via the MQTT last will when the PC or the
 program stops. The battery values are retained and have no availability topic, so Home Assistant keeps
 the last known level while the PC is off.
 

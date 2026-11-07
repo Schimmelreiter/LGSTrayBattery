@@ -25,6 +25,11 @@ namespace LGSTrayHID
         private BatteryUpdateReturn lastBatteryReturn;
         private DateTimeOffset lastUpdate = DateTimeOffset.MinValue;
 
+        // No answer to battery queries since (a sleeping device does not answer; only long gaps are logged)
+        private DateTimeOffset? _noAnswerSince;
+        private bool _noAnswerLogged;
+        private static readonly TimeSpan NoAnswerLogAfter = TimeSpan.FromMinutes(30);
+
         private readonly HidppDevices _parent;
         public HidppDevices Parent => _parent;
 
@@ -219,14 +224,30 @@ namespace LGSTrayHID
 
             var ret = await _getBatteryAsync.Invoke(this);
 
-            if (ret == null) { return; }
+            if (ret == null)
+            {
+                _noAnswerSince ??= DateTimeOffset.Now;
+                if (!_noAnswerLogged && DateTimeOffset.Now - _noAnswerSince > NoAnswerLogAfter)
+                {
+                    AppLog.Write($"HID: {DeviceName} ({Identifier}) has not answered battery queries since {_noAnswerSince:HH:mm:ss}");
+                    _noAnswerLogged = true;
+                }
+                return;
+            }
+            if (_noAnswerLogged)
+            {
+                AppLog.Write($"HID: {DeviceName} ({Identifier}) answers battery queries again");
+            }
+            _noAnswerSince = null;
+            _noAnswerLogged = false;
 
             var batStatus = ret.Value;
             lastUpdate = DateTimeOffset.Now;
 
-            if (forceIpcUpdate || (batStatus == lastBatteryReturn))
+            // Don't report if no change - unless an update is forced (was inverted before: a forced
+            // update was never reported)
+            if (!forceIpcUpdate && (batStatus == lastBatteryReturn))
             {
-                // Don't report if no change
                 return;
             }
 

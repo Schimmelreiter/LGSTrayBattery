@@ -31,6 +31,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
         public bool HasBattery = true;
         public bool Announced;
         public bool VoltageAnnounced;
+        public string? BatteryIcon;
         public UpdateMessage? Last;
     }
 
@@ -160,7 +161,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
             $"{_settings.DiscoveryPrefix}/binary_sensor/lgstray_{_node}/online/config",
             JsonConvert.SerializeObject(new Dictionary<string, object?>
             {
-                ["name"] = null,
+                // no "name": Home Assistant uses the translated name of the device class
                 ["unique_id"] = $"lgstray_{_node}_online",
                 ["default_entity_id"] = $"binary_sensor.lgstray_{_node}_online",
                 ["state_topic"] = _statusTopic,
@@ -255,7 +256,8 @@ public partial class MqttPublisher : IHostedService, IDisposable
         {
             DeviceState d;
             UpdateMessage? last;
-            bool announce, announceVoltage;
+            bool announce, announceVoltage, announceBattery;
+            string? icon;
             lock (_lock)
             {
                 d = _devices[id];
@@ -266,23 +268,36 @@ public partial class MqttPublisher : IHostedService, IDisposable
                 }
                 announce = !d.Announced;
                 announceVoltage = !d.VoltageAnnounced && last != null && last.batteryMVolt > 0;
+                icon = ChargingIcon(last);
+                announceBattery = announce || icon != d.BatteryIcon;
                 d.Announced = true;
                 d.VoltageAnnounced |= announceVoltage;
+                d.BatteryIcon = icon;
             }
 
             string obj = $"lgstray_{_node}_{Sanitize(id)}";
             string stateTopic = $"{_baseTopic}/{Sanitize(id)}/state";
 
+            if (announceBattery)
+            {
+                // While charging, the icon is sent with the discovery (like the companion app does);
+                // otherwise Home Assistant shows its normal battery icon for the level.
+                var battery = new Dictionary<string, object?>
+                {
+                    ["device_class"] = "battery",
+                    ["unit_of_measurement"] = "%",
+                    ["state_class"] = "measurement",
+                    ["suggested_display_precision"] = 0,
+                    ["value_template"] = "{{ value_json.battery }}",
+                };
+                if (icon != null)
+                {
+                    battery["icon"] = icon;
+                }
+                await Enqueue($"{_settings.DiscoveryPrefix}/sensor/{obj}/battery/config", Discovery(d, id, obj, stateTopic, "sensor", "battery", battery));
+            }
             if (announce)
             {
-                await Enqueue($"{_settings.DiscoveryPrefix}/sensor/{obj}/battery/config", Discovery(d, id, obj, stateTopic, "sensor", "battery",
-                    new()
-                    {
-                        ["device_class"] = "battery",
-                        ["unit_of_measurement"] = "%",
-                        ["state_class"] = "measurement",
-                        ["value_template"] = "{{ value_json.battery }}",
-                    }));
                 await Enqueue($"{_settings.DiscoveryPrefix}/binary_sensor/{obj}/charging/config", Discovery(d, id, obj, stateTopic, "binary_sensor", "charging",
                     new()
                     {
@@ -318,7 +333,7 @@ public partial class MqttPublisher : IHostedService, IDisposable
             {
                 var state = new Dictionary<string, object?>
                 {
-                    ["battery"] = Math.Round(last.batteryPercentage, 0),
+                    ["battery"] = (int)Math.Round(last.batteryPercentage),
                     ["charging"] = last.powerSupplyStatus == PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING ? "ON" : "OFF",
                     ["status"] = last.powerSupplyStatus.ToString().Replace("POWER_SUPPLY_STATUS_", "").ToLowerInvariant(),
                     ["voltage"] = last.batteryMVolt > 0 ? Math.Round(last.batteryMVolt / 1000.0, 3) : null,
@@ -347,7 +362,8 @@ public partial class MqttPublisher : IHostedService, IDisposable
     {
         var config = new Dictionary<string, object?>
         {
-            ["name"] = null, // Home Assistant uses the translated name of the device class
+            // no "name" (unless given in extra): Home Assistant uses the translated name of the device
+            // class ("name": null would mean "this entity is the device" and show the device name)
             ["unique_id"] = $"{obj}_{key}",
             ["default_entity_id"] = $"{domain}.{obj}_{key}",
             ["state_topic"] = stateTopic,
@@ -366,6 +382,23 @@ public partial class MqttPublisher : IHostedService, IDisposable
             config[k] = v;
         }
         return JsonConvert.SerializeObject(config);
+    }
+
+    /// <summary>mdi:battery-charging-NN while charging, otherwise null (default battery icon).</summary>
+    private static string? ChargingIcon(UpdateMessage? last)
+    {
+        if (last == null || last.batteryPercentage < 0
+            || last.powerSupplyStatus != PowerSupplyStatus.POWER_SUPPLY_STATUS_CHARGING)
+        {
+            return null;
+        }
+        int level = (int)Math.Round(last.batteryPercentage) / 10 * 10;
+        return level switch
+        {
+            >= 100 => "mdi:battery-charging-100",
+            < 10 => "mdi:battery-charging-outline",
+            _ => $"mdi:battery-charging-{level}",
+        };
     }
 
     private static MqttApplicationMessage Message(string topic, string payload) =>

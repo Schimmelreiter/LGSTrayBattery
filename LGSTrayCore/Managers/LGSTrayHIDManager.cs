@@ -1,4 +1,5 @@
-﻿using LGSTrayPrimitives.MessageStructs;
+﻿using LGSTrayPrimitives;
+using LGSTrayPrimitives.MessageStructs;
 using MessagePack.Resolvers;
 using MessagePipe;
 using Microsoft.Extensions.Hosting;
@@ -134,7 +135,20 @@ namespace LGSTrayCore.Managers
                 while (!_cts.Token.IsCancellationRequested)
                 {
                     DateTime then = DateTime.Now;
-                    int ret = await DaemonLoop();
+                    int ret;
+                    try
+                    {
+                        ret = await DaemonLoop();
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLog.Write("HID helper (LGSTrayHID.exe) could not be started", ex);
+                        ret = int.MinValue;
+                    }
+                    if (ret != -1 && !_cts.Token.IsCancellationRequested)
+                    {
+                        AppLog.Write($"HID helper (LGSTrayHID.exe) exited with code {ret} after {(DateTime.Now - then).TotalSeconds:f0} s - restarting");
+                    }
 
                     // Daemon returns -1 on .Kill(), assume its user
                     if ((ret != -1) || (DateTime.Now - then).TotalSeconds < 20)
@@ -148,7 +162,7 @@ namespace LGSTrayCore.Managers
 
                     if (fastFailCount > 3)
                     {
-                        // Notify user?
+                        AppLog.Write("HID helper (LGSTrayHID.exe) failed 4 times in a row - native HID devices disabled until LGSTray is restarted");
                         break;
                     }
                 }
