@@ -68,7 +68,10 @@ public partial class MqttPublisher
     private void StopPc()
     {
         _pcCts?.Cancel();
-        _pcStatus?.Dispose();
+        if (OperatingSystem.IsWindows())
+        {
+            _pcStatus?.Dispose();
+        }
         _pcStatus = null;
     }
 
@@ -255,11 +258,11 @@ public partial class MqttPublisher
         if (msg.Retain)
         {
             // a retained command would be executed again on every start
-            AppLog.Write($"MQTT command ignored (retained): {msg.ConvertPayloadToString()}");
+            AppLog.Write($"MQTT command ignored (retained): {PayloadText(msg)}");
             return Task.CompletedTask;
         }
 
-        string command = (msg.ConvertPayloadToString() ?? "").Trim().ToLowerInvariant();
+        string command = (PayloadText(msg) ?? "").Trim().ToLowerInvariant();
         AppLog.Write($"MQTT command received: {command}");
         try
         {
@@ -294,6 +297,12 @@ public partial class MqttPublisher
             AppLog.Write($"MQTT command {command} failed", ex);
         }
         return Task.CompletedTask;
+    }
+
+    private static string PayloadText(MQTTnet.MqttApplicationMessage msg)
+    {
+        var segment = msg.PayloadSegment;
+        return segment.Array == null ? "" : System.Text.Encoding.UTF8.GetString(segment.Array, segment.Offset, segment.Count);
     }
 
     private static void RunShutdown(string arguments)
